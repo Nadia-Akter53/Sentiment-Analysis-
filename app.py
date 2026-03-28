@@ -1,51 +1,15 @@
+import streamlit as st
 import pickle
 import re
-from flask import Flask, request, render_template_string
 
-# Load the pre-trained model (pipeline)
-with open('imdb_sentiment_model.pkl', 'rb') as f:
-    model = pickle.load(f)
+# Load the model
+@st.cache_resource
+def load_model():
+    with open('imdb_sentiment_model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    return model
 
-app = Flask(__name__)
-
-# HTML template embedded as a string
-HTML_TEMPLATE = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>IMDB Sentiment Analysis</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-        textarea { width: 80%; height: 150px; margin-bottom: 20px; }
-        .result { margin-top: 20px; font-weight: bold; }
-        .error { color: red; }
-        .positive { color: green; }
-        .negative { color: red; }
-    </style>
-</head>
-<body>
-    <h1>IMDB Movie Review Sentiment Analysis</h1>
-    <form action="/predict" method="post">
-        <textarea name="review" placeholder="Enter your movie review here...">{{ review if review else '' }}</textarea><br>
-        <input type="submit" value="Analyze Sentiment">
-    </form>
-
-    {% if sentiment %}
-        <div class="result">
-            <p><strong>Your review:</strong> {{ review }}</p>
-            <p><strong>Sentiment:</strong>
-                <span class="{{ 'positive' if sentiment == 'Positive' else 'negative' }}">{{ sentiment }}</span>
-            </p>
-            <p><strong>Confidence:</strong> {{ confidence }}%</p>
-        </div>
-    {% endif %}
-
-    {% if error %}
-        <p class="error">{{ error }}</p>
-    {% endif %}
-</body>
-</html>
-'''
+model = load_model()
 
 def preprocess_text(text):
     """Basic text cleaning – matches the vectorizer's expectations."""
@@ -55,30 +19,28 @@ def preprocess_text(text):
     text = re.sub(r'[^a-zA-Z\s]', '', text)
     return text.lower().strip()
 
-@app.route('/')
-def home():
-    return render_template_string(HTML_TEMPLATE)
+# Streamlit UI
+st.set_page_config(page_title="IMDB Sentiment Analysis", page_icon="🎬")
+st.title("🎬 IMDB Movie Review Sentiment Analysis")
+st.write("Enter a movie review below and find out if it's **positive** or **negative**.")
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    review = request.form.get('review', '')
+review = st.text_area("Your review:", height=200)
+
+if st.button("Analyze"):
     if not review.strip():
-        return render_template_string(HTML_TEMPLATE, error='Please enter a review.')
+        st.warning("Please enter a review.")
+    else:
+        processed_review = preprocess_text(review)
+        prediction = model.predict([processed_review])[0]
+        proba = model.predict_proba([processed_review])[0]
 
-    # Preprocess the input
-    processed_review = preprocess_text(review)
+        sentiment = "Positive" if prediction == 1 else "Negative"
+        confidence = round(proba[prediction] * 100, 2)
 
-    # Predict sentiment and probability
-    prediction = model.predict([processed_review])[0]
-    proba = model.predict_proba([processed_review])[0]
-
-    sentiment = 'Positive' if prediction == 1 else 'Negative'
-    confidence = round(proba[prediction] * 100, 2)
-
-    return render_template_string(HTML_TEMPLATE,
-                                   review=review,
-                                   sentiment=sentiment,
-                                   confidence=confidence)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+        st.markdown("---")
+        st.subheader("Results")
+        st.write(f"**Review:** {review}")
+        if sentiment == "Positive":
+            st.success(f"**Sentiment:** {sentiment} (confidence: {confidence}%)")
+        else:
+            st.error(f"**Sentiment:** {sentiment} (confidence: {confidence}%)")
