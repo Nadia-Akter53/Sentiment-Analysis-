@@ -167,7 +167,7 @@ def get_stats():
 # ----------------------------------------------------------------------
 @st.cache_resource
 def load_model():
-    model_path = 'imdb_sentiment_model.pkl'
+    model_path = 'imdb_sentiment_model .pkl'
     if not os.path.exists(model_path):
         st.error(f"Model file '{model_path}' not found. Please upload it to the same directory.")
         st.stop()
