@@ -12,14 +12,18 @@ from datetime import datetime
 
 warnings.filterwarnings('ignore')
 
+# ----------------------------------------------------------------------
 # Page configuration
+# ----------------------------------------------------------------------
 st.set_page_config(
     page_title="IMDB Sentiment Analysis",
     page_icon="🎬",
     layout="wide"
 )
 
+# ----------------------------------------------------------------------
 # Custom CSS
+# ----------------------------------------------------------------------
 st.markdown("""
 <style>
     .main { padding: 0rem 1rem; }
@@ -53,7 +57,6 @@ st.markdown("""
         display: inline-block;
     }
     
-    /* Prediction Result Boxes */
     .prediction-box {
         text-align: center;
         padding: 2rem;
@@ -163,23 +166,37 @@ def get_stats():
     return total, positive, negative, avg_conf
 
 # ----------------------------------------------------------------------
-# Model loading (cached)
+# Model loading (using pickle with the exact filename)
 # ----------------------------------------------------------------------
 @st.cache_resource
 def load_model():
+    # Note: filename includes a space before .pkl
     model_path = 'imdb_sentiment_model .pkl'
+    
     if not os.path.exists(model_path):
-        st.error(f"Model file '{model_path}' not found. Please upload it to the same directory.")
+        st.error(f"❌ Model file '{model_path}' not found. Please upload it to the same directory.")
         st.stop()
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
-    return model
+    
+    try:
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        return model
+    except Exception as e:
+        st.error(f"❌ Failed to load model: {str(e)}")
+        st.error("Possible reasons:\n"
+                 "- The file is corrupted.\n"
+                 "- The file was saved with a different Python version.\n"
+                 "- The file exceeds GitHub's size limit and was not fully uploaded.\n\n"
+                 "Try using Git LFS or re‑upload the model file.")
+        st.stop()
 
 # ----------------------------------------------------------------------
 # Text preprocessing
 # ----------------------------------------------------------------------
 def preprocess_text(text):
+    # Remove HTML tags
     text = re.sub(r'<[^>]+>', '', text)
+    # Keep only letters and spaces
     text = re.sub(r'[^a-zA-Z\s]', '', text)
     return text.lower().strip()
 
@@ -309,7 +326,7 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Show confidence gauge (optional)
+            # Show confidence gauge
             fig = go.Figure(go.Indicator(
                 mode = "gauge+number",
                 value = confidence_percent,
@@ -348,7 +365,6 @@ with tab2:
         }, inplace=True)
         st.dataframe(display_df, use_container_width=True, height=400)
         
-        # Delete button
         if st.button("🗑️ Clear All History", type="secondary"):
             conn = sqlite3.connect('sentiment.db')
             conn.execute("DELETE FROM predictions")
@@ -394,9 +410,9 @@ with tab3:
                       color_discrete_map={'Positive': '#10b981', 'Negative': '#ef4444'})
         st.plotly_chart(fig3, use_container_width=True)
         
-        # Word cloud (optional, requires additional library; skip for simplicity)
+        # Word cloud placeholder
         st.markdown("#### 📝 Most Common Words in Positive Reviews")
-        st.info("Word cloud feature could be added here using the wordcloud library.")
+        st.info("Word cloud feature can be added here using the wordcloud library.")
     else:
         st.info("No data yet. Make some predictions to see visualizations!")
 
@@ -431,7 +447,7 @@ with tab4:
     - SQLite for storing predictions
     
     ---
-    *Note: This is a demonstration project. For medical advice, please consult a healthcare professional.*
+    *Note: This is a demonstration project.*
     """)
 
 st.markdown("---")
